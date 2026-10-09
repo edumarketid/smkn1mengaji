@@ -6,13 +6,10 @@
   <title>Monitoring Pengajian Siswa</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#059669">
-  <!-- Tailwind CSS -->
+  
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- HTML5-QRCode Scanner -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- SheetJS & jsPDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
@@ -32,14 +29,17 @@
   <header class="bg-emerald-600 text-white p-4 sticky top-0 z-30 shadow-md flex justify-between items-center">
     <div>
       <h1 class="font-bold text-lg leading-tight">Pengajian Siswa</h1>
-      <p id="netStatus" class="text-xs text-emerald-100"><i class="fa-solid fa-circle text-xs text-emerald-300"></i> Online</p>
+      <p id="netStatus" class="text-xs flex items-center gap-1.5 text-emerald-100">
+        <span id="netDot" class="w-2 h-2 rounded-full bg-emerald-300"></span> 
+        <span id="netText">Memeriksa...</span>
+      </p>
     </div>
-    <button onclick="syncLocalToRemote()" class="bg-emerald-700 hover:bg-emerald-800 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1">
-      <i class="fa-solid fa-rotate"></i> Sync
+    <button onclick="syncLocalToRemote()" class="bg-emerald-700 hover:bg-emerald-800 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 active:scale-95 transition">
+      <i class="fa-solid fa-rotate" id="syncIcon"></i> Sync Data
     </button>
   </header>
 
-  <!-- Login Modal Overlay -->
+  <!-- Login Modal -->
   <div id="loginModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl text-center">
       <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
@@ -52,7 +52,6 @@
     </div>
   </div>
 
-  <!-- Content Views Container -->
   <main class="p-4 max-w-md mx-auto">
 
     <!-- VIEW 1: BERANDA -->
@@ -76,6 +75,15 @@
         </div>
       </div>
 
+      <!-- KARTU SISWA PER KELAS -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm">
+        <h3 class="font-bold text-xs text-slate-700 mb-3 flex items-center justify-between">
+          <span><i class="fa-solid fa-users-rectangle text-emerald-600 mr-1"></i> Jumlah Siswa per Kelas</span>
+          <span id="totalSiswaBadge" class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Total: 0</span>
+        </h3>
+        <div id="kelasCountList" class="grid grid-cols-2 gap-2 text-xs"></div>
+      </div>
+
       <div class="bg-white p-4 rounded-2xl shadow-sm">
         <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-clock-rotate-left text-emerald-600 mr-1"></i> Kehadiran Terbaru</h3>
         <div id="recentAttendanceList" class="space-y-2 text-xs text-slate-600">
@@ -89,35 +97,47 @@
       <div class="bg-white p-4 rounded-2xl shadow-sm">
         <h3 class="font-bold text-slate-700 mb-3"><i class="fa-solid fa-book-quran text-emerald-600 mr-1"></i> Input Progres Bacaan/Hafalan</h3>
         <form id="formProgres" onsubmit="saveProgres(event)" class="space-y-3 text-xs">
-          <div>
-            <label class="font-semibold block mb-1">Pilih Siswa</label>
-            <select id="progSiswa" class="w-full border p-2.5 rounded-xl bg-slate-50 focus:outline-emerald-600" required></select>
+          
+          <!-- FILTER KELAS & PILIH SISWA -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-semibold block mb-1">Filter Kelas</label>
+              <select id="progFilterKelas" onchange="filterSiswaByKelas()" class="w-full border p-2.5 rounded-xl bg-slate-50 focus:outline-emerald-600">
+                <option value="">Semua Kelas</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-semibold block mb-1">Pilih Siswa</label>
+              <select id="progSiswa" class="w-full border p-2.5 rounded-xl bg-slate-50 focus:outline-emerald-600" required></select>
+            </div>
           </div>
+
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="font-semibold block mb-1">Kategori</label>
-              <select id="progTipe" onchange="toggleProgresFields()" class="w-full border p-2.5 rounded-xl bg-slate-50 focus:outline-emerald-600">
+              <select id="progTipe" class="w-full border p-2.5 rounded-xl bg-slate-50 focus:outline-emerald-600">
                 <option value="Iqro">Iqro</option>
                 <option value="Al-Quran">Al-Qur'an</option>
                 <option value="Hafalan">Hafalan Surah/Doa</option>
               </select>
             </div>
             <div>
-              <label class="font-semibold block mb-1">Tingkat/Surah</label>
-              <input type="text" id="progDetail" placeholder="Misal: Iqro 3 / Surah Al-Baqarah" class="w-full border p-2.5 rounded-xl bg-slate-50" required>
+              <label class="font-semibold block mb-1">Tingkat / Surah</label>
+              <input type="text" id="progDetail" placeholder="Iqro 3 / Surah Al-Baqarah" class="w-full border p-2.5 rounded-xl bg-slate-50" required>
             </div>
           </div>
+          
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="font-semibold block mb-1">Halaman / Ayat</label>
-              <input type="text" id="progHal" placeholder="Misal: Hal 12 / Ayat 1-15" class="w-full border p-2.5 rounded-xl bg-slate-50" required>
+              <input type="text" id="progHal" placeholder="Hal 12 / Ayat 1-15" class="w-full border p-2.5 rounded-xl bg-slate-50" required>
             </div>
             <div>
               <label class="font-semibold block mb-1">Catatan</label>
-              <input type="text" id="progCatatan" placeholder="Lancar/Perlu makhraj..." class="w-full border p-2.5 rounded-xl bg-slate-50">
+              <input type="text" id="progCatatan" placeholder="Lancar / Perlu tajwid..." class="w-full border p-2.5 rounded-xl bg-slate-50">
             </div>
           </div>
-          <button type="submit" class="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-xl shadow">Simpan Progres</button>
+          <button type="submit" class="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-xl shadow active:scale-95 transition">Simpan Progres</button>
         </form>
       </div>
 
@@ -127,13 +147,40 @@
       </div>
     </section>
 
-    <!-- VIEW 3: SCANNER MODAL / VIEW -->
+    <!-- VIEW 3: SCANNER -->
     <section id="view-scan" class="space-y-4 hidden">
       <div class="bg-white p-4 rounded-2xl shadow-sm text-center">
         <h3 class="font-bold text-slate-700 mb-1">Scanner Kehadiran</h3>
         <p class="text-xs text-slate-500 mb-3">Arahkan kamera ke QR Code milik siswa</p>
-        <div id="reader" class="overflow-hidden rounded-2xl border-2 border-emerald-500 bg-slate-900 mx-auto"></div>
-        <div id="scanResult" class="mt-3 p-3 bg-slate-50 rounded-xl text-xs font-semibold text-emerald-700 hidden"></div>
+        
+        <!-- BINGKAI & KONTROL KAMERA -->
+        <div class="relative">
+          <div id="reader" class="overflow-hidden rounded-2xl border-2 border-emerald-500 bg-slate-900 mx-auto min-h-[250px]"></div>
+          
+          <!-- Tombol Kontrol Kamera Melayang -->
+          <div class="flex justify-center gap-2 mt-3">
+            <button onclick="switchCamera()" class="bg-slate-800 text-white text-xs px-3 py-2 rounded-xl shadow flex items-center gap-1 active:scale-95 transition">
+              <i class="fa-solid fa-camera-rotate"></i> Saklar Kamera
+            </button>
+            <button onclick="stopScanner()" class="bg-rose-600 text-white text-xs px-3 py-2 rounded-xl shadow flex items-center gap-1 active:scale-95 transition">
+              <i class="fa-solid fa-circle-stop"></i> Hentikan Scanner
+            </button>
+          </div>
+        </div>
+
+        <!-- HASIL SCAN DETAIL -->
+        <div id="scanResult" class="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 text-left hidden space-y-1">
+          <div class="flex items-center gap-2 font-bold text-emerald-700">
+            <i class="fa-solid fa-circle-check text-emerald-600 text-base"></i>
+            <span>Absensi Berhasil Dicatat!</span>
+          </div>
+          <div class="pl-6 space-y-0.5">
+            <p><span class="font-semibold">Nama:</span> <span id="resNama">-</span></p>
+            <p><span class="font-semibold">Kelas:</span> <span id="resKelas">-</span></p>
+            <p><span class="font-semibold">NIS:</span> <span id="resNis">-</span></p>
+            <p><span class="font-semibold">Waktu:</span> <span id="resWaktu">-</span></p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -200,45 +247,37 @@
     </div>
   </div>
 
-  <!-- Bottom Navigation Bar (e-Wallet Style) -->
+  <!-- Bottom Navigation Bar -->
   <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-2 py-2 z-40">
     <div class="max-w-md mx-auto flex justify-between items-center relative">
-      
-      <!-- Left 1: Beranda -->
       <button onclick="switchTab('beranda')" id="nav-beranda" class="nav-btn active flex-1 flex flex-col items-center text-slate-400 text-[10px]">
         <i class="fa-solid fa-house text-lg mb-0.5"></i>
         <span>Beranda</span>
       </button>
 
-      <!-- Left 2: Progres -->
       <button onclick="switchTab('progres')" id="nav-progres" class="nav-btn flex-1 flex flex-col items-center text-slate-400 text-[10px] mr-4">
         <i class="fa-solid fa-book-open text-lg mb-0.5"></i>
         <span>Progres</span>
       </button>
 
-      <!-- Center Floating Button: Scanner -->
       <div class="absolute left-1/2 -translate-x-1/2 -top-5">
         <button onclick="switchTab('scan')" class="scan-fab w-14 h-14 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xl border-4 border-slate-100 active:scale-95 transition">
           <i class="fa-solid fa-qrcode"></i>
         </button>
       </div>
 
-      <!-- Right 1: Data Siswa -->
       <button onclick="switchTab('siswa')" id="nav-siswa" class="nav-btn flex-1 flex flex-col items-center text-slate-400 text-[10px] ml-4">
         <i class="fa-solid fa-users text-lg mb-0.5"></i>
         <span>Siswa</span>
       </button>
 
-      <!-- Right 2: Laporan -->
       <button onclick="switchTab('laporan')" id="nav-laporan" class="nav-btn flex-1 flex flex-col items-center text-slate-400 text-[10px]">
         <i class="fa-solid fa-chart-pie text-lg mb-0.5"></i>
         <span>Laporan</span>
       </button>
-
     </div>
   </nav>
 
-  <!-- Core JavaScript Logic -->
   <script>
     // MASUKKAN URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA DI SINI
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzhQhmBMMCnIWPDFfVhL99l2c5cXlti0OMevoRTIORZOJKkkK7CQqJ8a6c-SG49gOic/exec";
@@ -251,17 +290,32 @@
     };
 
     let html5QrcodeScanner = null;
+    let currentFacingMode = "environment"; // Kamera belakang bawaan
 
-    // Service Worker Registration
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').then(() => console.log('SW Registered'));
+      navigator.serviceWorker.register('./sw.js').then(() => console.log('SW Active'));
     }
 
     window.onload = function() {
       document.getElementById('todayDate').innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      updateNetworkStatus();
+      window.addEventListener('online', updateNetworkStatus);
+      window.addEventListener('offline', updateNetworkStatus);
       renderAll();
       fetchRemoteData();
     };
+
+    function updateNetworkStatus() {
+      const dot = document.getElementById('netDot');
+      const text = document.getElementById('netText');
+      if (navigator.onLine) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-300 animate-pulse";
+        text.innerText = "Online";
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-rose-400";
+        text.innerText = "Offline (Lokal)";
+      }
+    }
 
     function saveLocal() {
       localStorage.setItem('db_siswa', JSON.stringify(db.siswa));
@@ -297,8 +351,10 @@
 
     function renderAll() {
       renderStats();
+      renderKelasCards();
       renderSiswaList();
-      renderProgresSelect();
+      populateKelasFilter();
+      filterSiswaByKelas();
       renderProgresHistory();
     }
 
@@ -315,11 +371,11 @@
         listContainer.innerHTML = '<p class="text-slate-400 italic">Belum ada data absensi hari ini.</p>';
       } else {
         listContainer.innerHTML = todayAbsensi.slice(-5).reverse().map(a => {
-          const s = db.siswa.find(x => x.NIS === a.NIS) || { Nama: a.NIS };
+          const s = db.siswa.find(x => x.NIS === a.NIS) || { Nama: a.NIS, Kelas: '-' };
           return `
             <div class="flex justify-between items-center p-2 bg-slate-50 rounded-xl">
               <div>
-                <p class="font-bold text-slate-700">${s.Nama}</p>
+                <p class="font-bold text-slate-700">${s.Nama} <span class="text-[10px] text-slate-400">(${s.Kelas})</span></p>
                 <p class="text-[10px] text-slate-400">${a.Waktu}</p>
               </div>
               <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.Status==='Hadir'?'bg-emerald-100 text-emerald-700':a.Status==='Izin'?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}">${a.Status}</span>
@@ -329,29 +385,56 @@
       }
     }
 
+    function renderKelasCards() {
+      const countMap = {};
+      db.siswa.forEach(s => {
+        const k = s.Kelas || 'Tanpa Kelas';
+        countMap[k] = (countMap[k] || 0) + 1;
+      });
+
+      document.getElementById('totalSiswaBadge').innerText = `Total: ${db.siswa.length} Siswa`;
+      const container = document.getElementById('kelasCountList');
+      const keys = Object.keys(countMap);
+
+      if (keys.length === 0) {
+        container.innerHTML = '<p class="text-slate-400 italic col-span-2">Belum ada data kelas.</p>';
+        return;
+      }
+
+      container.innerHTML = keys.map(k => `
+        <div class="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center">
+          <span class="font-bold text-slate-700">${k}</span>
+          <span class="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-lg text-[10px]">${countMap[k]} Siswa</span>
+        </div>
+      `).join('');
+    }
+
     function startScanner() {
       if (!html5QrcodeScanner) {
         html5QrcodeScanner = new Html5Qrcode("reader");
       }
+      if (html5QrcodeScanner.isScanning) return;
+
       html5QrcodeScanner.start(
-        { facingMode: "environment" },
+        { facingMode: currentFacingMode },
         { fps: 10, qrbox: { width: 220, height: 220 } },
         (decodedText) => {
           recordAbsensi(decodedText, "Hadir");
-          const res = document.getElementById('scanResult');
-          const s = db.siswa.find(x => x.NIS === decodedText);
-          res.innerText = `Berhasil Absen: ${s ? s.Nama : decodedText}`;
-          res.classList.remove('hidden');
-          setTimeout(() => res.classList.add('hidden'), 3000);
         },
         (errorMessage) => {}
-      ).catch(err => console.log(err));
+      ).catch(err => console.log('Scanner start error:', err));
     }
 
     function stopScanner() {
       if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-        html5QrcodeScanner.stop();
+        html5QrcodeScanner.stop().then(() => console.log('Scanner Stopped'));
       }
+    }
+
+    function switchCamera() {
+      stopScanner();
+      currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+      setTimeout(() => startScanner(), 300);
     }
 
     function recordAbsensi(nis, status) {
@@ -372,7 +455,39 @@
           Keterangan: 'Hadir Via Scanner'
         });
       }
+      
       saveLocal();
+
+      // Tampilkan hasil scan lengkap
+      const student = db.siswa.find(x => x.NIS === nis) || { Nama: "Tidak Terdaftar", Kelas: "-" };
+      document.getElementById('resNama').innerText = student.Nama;
+      document.getElementById('resKelas').innerText = student.Kelas;
+      document.getElementById('resNis').innerText = nis;
+      document.getElementById('resWaktu').innerText = now;
+
+      const resBox = document.getElementById('scanResult');
+      resBox.classList.remove('hidden');
+    }
+
+    function populateKelasFilter() {
+      const kelasSet = [...new Set(db.siswa.map(s => s.Kelas).filter(Boolean))];
+      const select = document.getElementById('progFilterKelas');
+      const currentVal = select.value;
+      
+      select.innerHTML = '<option value="">Semua Kelas</option>' + 
+        kelasSet.map(k => `<option value="${k}">${k}</option>`).join('');
+      select.value = currentVal;
+    }
+
+    function filterSiswaByKelas() {
+      const selectedKelas = document.getElementById('progFilterKelas').value;
+      const selectSiswa = document.getElementById('progSiswa');
+      
+      const filtered = selectedKelas 
+        ? db.siswa.filter(s => s.Kelas === selectedKelas)
+        : db.siswa;
+
+      selectSiswa.innerHTML = filtered.map(s => `<option value="${s.NIS}">${s.Nama} (${s.Kelas})</option>`).join('');
     }
 
     function renderSiswaList() {
@@ -469,11 +584,6 @@
       reader.readAsArrayBuffer(file);
     }
 
-    function renderProgresSelect() {
-      const select = document.getElementById('progSiswa');
-      select.innerHTML = db.siswa.map(s => `<option value="${s.NIS}">${s.Nama} (${s.Kelas})</option>`).join('');
-    }
-
     function saveProgres(e) {
       e.preventDefault();
       const nis = document.getElementById('progSiswa').value;
@@ -481,6 +591,8 @@
       const detail = document.getElementById('progDetail').value;
       const hal = document.getElementById('progHal').value;
       const catatan = document.getElementById('progCatatan').value;
+
+      if (!nis) return alert('Silakan pilih siswa!');
 
       db.progres.push({
         ID: 'PROG-' + Date.now(),
@@ -494,6 +606,7 @@
 
       saveLocal();
       document.getElementById('formProgres').reset();
+      filterSiswaByKelas();
       alert('Progres berhasil disimpan!');
     }
 
@@ -504,11 +617,11 @@
         return;
       }
       container.innerHTML = db.progres.slice(-5).reverse().map(p => {
-        const s = db.siswa.find(x => x.NIS === p.NIS) || { Nama: p.NIS };
+        const s = db.siswa.find(x => x.NIS === p.NIS) || { Nama: p.NIS, Kelas: '-' };
         return `
           <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
             <div class="flex justify-between font-bold text-slate-700">
-              <span>${s.Nama}</span>
+              <span>${s.Nama} <span class="text-[10px] text-slate-400">(${s.Kelas})</span></span>
               <span class="text-emerald-600">${p.Tipe}</span>
             </div>
             <p class="text-slate-600 mt-1">${p.Detail} - ${p.HalamanSurat}</p>
@@ -520,14 +633,9 @@
 
     function exportExcel() {
       const wb = XLSX.utils.book_new();
-      const wsSiswa = XLSX.utils.json_to_sheet(db.siswa);
-      const wsAbsensi = XLSX.utils.json_to_sheet(db.absensi);
-      const wsProgres = XLSX.utils.json_to_sheet(db.progres);
-
-      XLSX.utils.book_append_sheet(wb, wsSiswa, "Siswa");
-      XLSX.utils.book_append_sheet(wb, wsAbsensi, "Absensi");
-      XLSX.utils.book_append_sheet(wb, wsProgres, "Progres");
-
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.siswa), "Siswa");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.absensi), "Absensi");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.progres), "Progres");
       XLSX.writeFile(wb, `Laporan_Pengajian_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
@@ -540,13 +648,13 @@
       doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 22);
 
       const progresData = db.progres.map(p => {
-        const s = db.siswa.find(x => x.NIS === p.NIS) || { Nama: p.NIS };
-        return [p.Tanggal, s.Nama, p.Tipe, p.Detail, p.HalamanSurat, p.Catatan || '-'];
+        const s = db.siswa.find(x => x.NIS === p.NIS) || { Nama: p.NIS, Kelas: '-' };
+        return [p.Tanggal, s.Nama, s.Kelas, p.Tipe, p.Detail, p.HalamanSurat, p.Catatan || '-'];
       });
 
       doc.autoTable({
         startY: 28,
-        head: [['Tanggal', 'Nama Siswa', 'Kategori', 'Tingkat/Surah', 'Hal/Ayat', 'Catatan']],
+        head: [['Tanggal', 'Nama Siswa', 'Kelas', 'Kategori', 'Tingkat/Surah', 'Hal/Ayat', 'Catatan']],
         body: progresData,
       });
 
@@ -569,7 +677,7 @@
     }
 
     function fetchRemoteData() {
-      if (!GAS_URL || GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
+      if (!GAS_URL || GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT") || !navigator.onLine) return;
       fetch(`${GAS_URL}?action=getInitialData`)
         .then(res => res.json())
         .then(data => {
@@ -580,20 +688,30 @@
             if (data.password) db.password = String(data.password);
             saveLocal();
           }
-        }).catch(err => console.log('Offline / Fetch Failed'));
+        }).catch(err => console.log('Offline / Fetch Ignored'));
     }
 
     function syncLocalToRemote() {
-      if (!GAS_URL || GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-        return alert('Harap atur GAS_URL terlebih dahulu!');
-      }
+      if (!navigator.onLine) return alert('HP Anda sedang Offline. Hubungkan ke internet untuk melakukan Sync.');
+      if (!GAS_URL || GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return alert('Harap atur GAS_URL terlebih dahulu!');
+
+      const icon = document.getElementById('syncIcon');
+      icon.classList.add('fa-spin');
+
       fetch(GAS_URL, {
         method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' }, // Menggunakan text/plain untuk menghindari batasan CORS GAS
         body: JSON.stringify({ action: 'syncData', payload: db })
-      }).then(() => alert('Sinkronisasi data ke spreadsheet berhasil terkirim!'))
-        .catch(err => alert('Gagal terhubung ke Server'));
+      })
+      .then(res => res.json())
+      .then(res => {
+        icon.classList.remove('fa-spin');
+        alert('Sinkronisasi kilat ke spreadsheet berhasil!');
+      })
+      .catch(err => {
+        icon.classList.remove('fa-spin');
+        alert('Gagal terhubung ke spreadsheet server.');
+      });
     }
   </script>
 </body>
