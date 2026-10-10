@@ -484,14 +484,51 @@
       const today = new Date().toISOString().split('T')[0];
       const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       
+      const nisStr = String(nis).trim(); // Pastikan NIS dikonversi ke string tanpa spasi
+      
       const absensiData = {
         ID: 'ABS-' + Date.now(),
-        NIS: nis,
+        NIS: nisStr,
         Tanggal: today,
         Waktu: now,
         Status: status,
         Keterangan: 'Hadir Via Scanner'
       };
+
+      // 1. Simpan ke LocalStorage HP lebih dulu
+      const existingIndex = db.absensi.findIndex(a => String(a.NIS) === nisStr && a.Tanggal === today);
+      if (existingIndex >= 0) {
+        db.absensi[existingIndex].Status = status;
+        db.absensi[existingIndex].Waktu = now;
+      } else {
+        db.absensi.push(absensiData);
+      }
+      saveLocal();
+
+      // 2. Cari data siswa dengan konversi String agar presisi
+      const student = db.siswa.find(x => String(x.NIS).trim() === nisStr);
+
+      // 3. Update isi teks overlay di dalam bingkai kamera
+      document.getElementById('resNama').innerText = student ? student.Nama : "Siswa Tidak Dikenal";
+      document.getElementById('resKelas').innerText = student ? student.Kelas : "-";
+      document.getElementById('resNis').innerText = nisStr;
+      document.getElementById('resWaktu').innerText = now;
+
+      // Tampilkan Overlay
+      document.getElementById('scanOverlay').classList.remove('hidden');
+
+      // 4. AUTO-SYNC Otomatis ke Spreadsheet di Background
+      if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'recordSingleAbsensi', data: absensiData })
+        })
+        .then(res => res.json())
+        .then(res => console.log('Auto-sync sukses:', res))
+        .catch(err => console.log('Auto-sync offline/gagal:', err));
+      }
+    }
 
       // 1. Simpan ke LocalStorage HP lebih dulu
       const existingIndex = db.absensi.findIndex(a => a.NIS === nis && a.Tanggal === today);
