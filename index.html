@@ -446,22 +446,32 @@
       ).catch(err => console.log('Scanner start error:', err));
     }
 
-    function recordAbsensi(nis, status) {
+    function recordAbsensi(rawQrText, status) {
       const today = new Date().toISOString().split('T')[0];
       const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       
-      const nisStr = String(nis).trim();
-      
+      const scannedCode = String(rawQrText).trim(); // Kode QR utuh (misal: S001)
+
+      // 1. Cari Siswa berdasarkan QR_Code terlebih dahulu, jika tidak ada baru cari berdasarkan NIS
+      const student = db.siswa.find(x => 
+        (x.QR_Code && String(x.QR_Code).trim().toUpperCase() === scannedCode.toUpperCase()) ||
+        String(x.NIS).trim() === scannedCode
+      );
+
+      // Ambil NIS asli siswa jika terdaftar
+      const finalNis = student ? String(student.NIS) : scannedCode;
+
       const absensiData = {
         ID: 'ABS-' + Date.now(),
-        NIS: nisStr,
+        NIS: finalNis,
         Tanggal: today,
         Waktu: now,
         Status: status,
         Keterangan: 'Hadir Via Scanner'
       };
 
-      const existingIndex = db.absensi.findIndex(a => String(a.NIS) === nisStr && a.Tanggal === today);
+      // 2. Simpan ke LocalStorage HP
+      const existingIndex = db.absensi.findIndex(a => String(a.NIS) === finalNis && a.Tanggal === today);
       if (existingIndex >= 0) {
         db.absensi[existingIndex].Status = status;
         db.absensi[existingIndex].Waktu = now;
@@ -470,15 +480,15 @@
       }
       saveLocal();
 
-      const student = db.siswa.find(x => String(x.NIS).trim() === nisStr);
-
+      // 3. Update Tampilan Overlay di Dalam Kamera
       document.getElementById('resNama').innerText = student ? student.Nama : "Siswa Tidak Dikenal";
       document.getElementById('resKelas').innerText = student ? student.Kelas : "-";
-      document.getElementById('resNis').innerText = nisStr;
+      document.getElementById('resNis').innerText = finalNis; // Menampilkan NIS Asli Siswa
       document.getElementById('resWaktu').innerText = now;
 
       document.getElementById('scanOverlay').classList.remove('hidden');
 
+      // 4. AUTO-SYNC Otomatis ke Spreadsheet
       if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
         fetch(GAS_URL, {
           method: 'POST',
