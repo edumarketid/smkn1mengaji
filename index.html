@@ -228,6 +228,46 @@
 
   </main>
 
+  <!-- Modal Edit Progres -->
+  <div id="modalEditProgres" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-5 space-y-3 text-xs">
+      <h3 class="font-bold text-sm text-slate-800">Edit Progres Bacaan</h3>
+      <input type="hidden" id="editProgresId">
+      <div>
+        <label class="block font-semibold mb-1">Nama Siswa</label>
+        <input type="text" id="editProgNama" class="w-full border p-2 rounded-xl bg-slate-100" readonly>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold mb-1">Kategori</label>
+          <select id="editProgTipe" class="w-full border p-2 rounded-xl">
+            <option value="Iqro">Iqro</option>
+            <option value="Al-Quran">Al-Qur'an</option>
+            <option value="Hafalan">Hafalan Surah/Doa</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold mb-1">Tingkat/Surah</label>
+          <input type="text" id="editProgDetail" class="w-full border p-2 rounded-xl" required>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold mb-1">Halaman/Ayat</label>
+          <input type="text" id="editProgHal" class="w-full border p-2 rounded-xl" required>
+        </div>
+        <div>
+          <label class="block font-semibold mb-1">Catatan</label>
+          <input type="text" id="editProgCatatan" class="w-full border p-2 rounded-xl">
+        </div>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="closeModalEditProgres()" type="button" class="flex-1 bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl">Batal</button>
+        <button onclick="saveEditProgres()" type="button" class="flex-1 bg-emerald-600 text-white font-semibold py-2 rounded-xl">Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Edit / Form Siswa -->
   <div id="modalSiswa" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white w-full max-w-sm rounded-2xl p-5 space-y-3 text-xs">
@@ -660,19 +700,69 @@
         container.innerHTML = '<p class="text-slate-400 italic">Belum ada riwayat progres.</p>';
         return;
       }
-      container.innerHTML = db.progres.slice(-5).reverse().map(p => {
+      container.innerHTML = db.progres.slice(-10).reverse().map(p => {
         const s = db.siswa.find(x => String(x.NIS) === String(p.NIS)) || { Nama: p.NIS, Kelas: '-' };
         return `
-          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-            <div class="flex justify-between font-bold text-slate-700">
-              <span>${s.Nama} <span class="text-[10px] text-slate-400">(${s.Kelas})</span></span>
-              <span class="text-emerald-600">${p.Tipe}</span>
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-start gap-2">
+            <div class="flex-1">
+              <div class="flex justify-between font-bold text-slate-700">
+                <span>${s.Nama} <span class="text-[10px] text-slate-400">(${s.Kelas})</span></span>
+                <span class="text-emerald-600">${p.Tipe}</span>
+              </div>
+              <p class="text-slate-600 mt-1">${p.Detail} - ${p.HalamanSurat}</p>
+              ${p.Catatan ? `<p class="text-[10px] text-slate-400 italic">Catatan: ${p.Catatan}</p>` : ''}
+              <p class="text-[9px] text-slate-400 mt-1"><i class="fa-regular fa-clock"></i> ${p.Tanggal}</p>
             </div>
-            <p class="text-slate-600 mt-1">${p.Detail} - ${p.HalamanSurat}</p>
-            ${p.Catatan ? `<p class="text-[10px] text-slate-400 italic">Catatan: ${p.Catatan}</p>` : ''}
+            <div class="flex gap-1">
+              <button onclick="openModalEditProgres('${p.ID}')" class="text-blue-600 bg-blue-50 p-1.5 rounded-lg active:scale-95"><i class="fa-solid fa-pen"></i></button>
+              <button onclick="deleteProgres('${p.ID}')" class="text-rose-600 bg-rose-50 p-1.5 rounded-lg active:scale-95"><i class="fa-solid fa-trash"></i></button>
+            </div>
           </div>
         `;
       }).join('');
+    }
+
+    function openModalEditProgres(id) {
+      const prog = db.progres.find(p => p.ID === id);
+      if (!prog) return;
+
+      const student = db.siswa.find(s => String(s.NIS) === String(prog.NIS)) || { Nama: prog.NIS };
+
+      document.getElementById('editProgresId').value = prog.ID;
+      document.getElementById('editProgNama').value = student.Nama;
+      document.getElementById('editProgTipe').value = prog.Tipe;
+      document.getElementById('editProgDetail').value = prog.Detail;
+      document.getElementById('editProgHal').value = prog.HalamanSurat;
+      document.getElementById('editProgCatatan').value = prog.Catatan || '';
+
+      document.getElementById('modalEditProgres').classList.remove('hidden');
+    }
+
+    function closeModalEditProgres() {
+      document.getElementById('modalEditProgres').classList.add('hidden');
+    }
+
+    function saveEditProgres() {
+      const id = document.getElementById('editProgresId').value;
+      const index = db.progres.findIndex(p => p.ID === id);
+
+      if (index >= 0) {
+        db.progres[index].Tipe = document.getElementById('editProgTipe').value;
+        db.progres[index].Detail = document.getElementById('editProgDetail').value;
+        db.progres[index].HalamanSurat = document.getElementById('editProgHal').value;
+        db.progres[index].Catatan = document.getElementById('editProgCatatan').value;
+
+        saveLocal();
+        closeModalEditProgres();
+        alert('Data progres berhasil diperbarui!');
+      }
+    }
+
+    function deleteProgres(id) {
+      if (confirm('Yakin ingin menghapus riwayat progres ini?')) {
+        db.progres = db.progres.filter(p => p.ID !== id);
+        saveLocal();
+      }
     }
 
     function exportExcel() {
