@@ -417,6 +417,8 @@
       `).join('');
     }
 
+    let isProcessingScan = false;
+
     function startScanner() {
       if (!html5QrcodeScanner) {
         html5QrcodeScanner = new Html5Qrcode("reader");
@@ -427,10 +429,75 @@
         { facingMode: currentFacingMode },
         { fps: 10, qrbox: { width: 220, height: 220 } },
         (decodedText) => {
+          // Cegah proses ganda saat kamera sedang dalam jeda 2 detik
+          if (isProcessingScan) return;
+          isProcessingScan = true;
+
+          // Jeda scanner kamera sejenak (pause)
+          if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+            html5QrcodeScanner.pause(true);
+          }
+
+          // Catat Absensi Lokal + Kirim Otomatis ke Spreadsheet
           recordAbsensi(decodedText, "Hadir");
+
+          // Setelah 2 detik, sembunyikan notifikasi dan kembalikan kamera ke mode standby (resume)
+          setTimeout(() => {
+            document.getElementById('scanResult').classList.add('hidden');
+            if (html5QrcodeScanner) {
+              html5QrcodeScanner.resume();
+            }
+            isProcessingScan = false;
+          }, 2000);
         },
         (errorMessage) => {}
       ).catch(err => console.log('Scanner start error:', err));
+    }
+
+    function recordAbsensi(nis, status) {
+      const today = new Date().toISOString().split('T')[0];
+      const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      
+      const absensiData = {
+        ID: 'ABS-' + Date.now(),
+        NIS: nis,
+        Tanggal: today,
+        Waktu: now,
+        Status: status,
+        Keterangan: 'Hadir Via Scanner'
+      };
+
+      // 1. Simpan ke LocalStorage HP lebih dulu (Offline-First)
+      const existingIndex = db.absensi.findIndex(a => a.NIS === nis && a.Tanggal === today);
+      if (existingIndex >= 0) {
+        db.absensi[existingIndex].Status = status;
+        db.absensi[existingIndex].Waktu = now;
+      } else {
+        db.absensi.push(absensiData);
+      }
+      saveLocal();
+
+      // 2. Tampilkan Hasil Scan Detail pada Layar
+      const student = db.siswa.find(x => x.NIS === nis) || { Nama: "Tidak Terdaftar", Kelas: "-" };
+      document.getElementById('resNama').innerText = student.Nama;
+      document.getElementById('resKelas').innerText = student.Kelas;
+      document.getElementById('resNis').innerText = nis;
+      document.getElementById('resWaktu').innerText = now;
+
+      const resBox = document.getElementById('scanResult');
+      resBox.classList.remove('hidden');
+
+      // 3. AUTO-SYNC: Kirim data absensi secara otomatis ke Spreadsheet tanpa tekan tombol Sync
+      if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'recordSingleAbsensi', data: absensiData })
+        })
+        .then(res => res.json())
+        .then(res => console.log('Auto-sync sukses:', res))
+        .catch(err => console.log('Auto-sync gagal, data tersimpan secara lokal:', err));
+      }
     }
 
     function stopScanner() {
