@@ -34,9 +34,11 @@
         <span id="netText">Memeriksa...</span>
       </p>
     </div>
-    <button onclick="syncLocalToRemote()" class="bg-emerald-700 hover:bg-emerald-800 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 active:scale-95 transition">
-      <i class="fa-solid fa-rotate" id="syncIcon"></i> Sync Data
-    </button>
+    <!-- Indikator Auto Sync -->
+    <div id="syncIndicator" class="text-xs bg-emerald-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-emerald-100">
+      <i class="fa-solid fa-cloud-arrow-up" id="syncIcon"></i>
+      <span id="syncText">Auto Sync</span>
+    </div>
   </header>
 
   <!-- Login Modal -->
@@ -73,6 +75,20 @@
             <span id="statAlfa" class="text-lg font-bold text-rose-500">0</span>
           </div>
         </div>
+      </div>
+
+      <!-- KARTU ANTREAN DATA OFFLINE (TAMPIL JIKA ADA ANTREAN) -->
+      <div id="queueCard" class="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl shadow-sm flex justify-between items-center hidden">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center text-lg">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs text-amber-900">Antrean Data Offline</h4>
+            <p id="queueCountText" class="text-[10px] text-amber-700">0 data belum terkirim ke server</p>
+          </div>
+        </div>
+        <span class="text-[10px] bg-amber-200 text-amber-800 px-2 py-1 rounded-lg font-semibold animate-pulse">Menunggu Koneksi</span>
       </div>
 
       <!-- KARTU SISWA PER KELAS -->
@@ -206,20 +222,15 @@
 
     <!-- VIEW 5: LAPORAN & PENGATURAN -->
     <section id="view-laporan" class="space-y-4 hidden">
+      <!-- FITUR LAPORAN KEHADIRAN (FILTER TANGGAL TERTENTU) -->
       <div class="bg-white p-4 rounded-2xl shadow-sm space-y-3">
         <h3 class="font-bold text-slate-700 text-xs flex items-center gap-1">
           <i class="fa-solid fa-calendar-check text-emerald-600"></i> Laporan Khusus Kehadiran Siswa
         </h3>
         
-        <div class="grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <label class="block text-slate-500 font-semibold mb-1">Mulai Tanggal</label>
-            <input type="date" id="absentStartDate" class="w-full border p-2 rounded-xl bg-slate-50">
-          </div>
-          <div>
-            <label class="block text-slate-500 font-semibold mb-1">Sampai Tanggal</label>
-            <input type="date" id="absentEndDate" class="w-full border p-2 rounded-xl bg-slate-50">
-          </div>
+        <div>
+          <label class="block text-slate-500 font-semibold mb-1 text-xs">Pilih Tanggal Kehadiran</label>
+          <input type="date" id="absentSingleDate" class="w-full border p-2.5 rounded-xl bg-slate-50 text-xs">
         </div>
 
         <button onclick="previewLaporan('absensi')" class="w-full bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-1 active:scale-95 transition">
@@ -373,12 +384,14 @@
       siswa: JSON.parse(localStorage.getItem('db_siswa')) || [],
       absensi: JSON.parse(localStorage.getItem('db_absensi')) || [],
       progres: JSON.parse(localStorage.getItem('db_progres')) || [],
+      queue: JSON.parse(localStorage.getItem('db_queue')) || [], // Antrean data offline
       password: localStorage.getItem('db_password') || "1234"
     };
 
     let html5QrcodeScanner = null;
     let currentFacingMode = "environment";
     let isProcessingScan = false;
+    let isSyncing = false;
     let activePreviewData = [];
     let activePreviewType = "";
 
@@ -389,21 +402,22 @@
     window.onload = function() {
       const now = new Date();
       document.getElementById('todayDate').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-      
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      document.getElementById('absentStartDate').value = getLocalDateString(firstDay);
-      document.getElementById('absentEndDate').value = getLocalDateString(now);
+      document.getElementById('absentSingleDate').value = getLocalDateString(now);
 
       updateNetworkStatus();
-      window.addEventListener('online', updateNetworkStatus);
+      window.addEventListener('online', () => {
+        updateNetworkStatus();
+        processQueueBackground(); // Kirim antrean lokal otomatis saat terhubung internet
+      });
       window.addEventListener('offline', updateNetworkStatus);
+      
       renderAll();
       fetchRemoteData();
+      processQueueBackground();
     };
 
-    // FUNGSI TANGGAL LOKAL AKURAT (MENGHINDARI SALAH ZONA WAKTU / MUNDUR 1 HARI)
     function getLocalDateString(d = new Date()) {
-      if (!(d instanceof Date) ||isNaN(d)) d = new Date(d);
+      if (!(d instanceof Date) || isNaN(d)) d = new Date(d);
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
@@ -434,6 +448,7 @@
       localStorage.setItem('db_siswa', JSON.stringify(db.siswa));
       localStorage.setItem('db_absensi', JSON.stringify(db.absensi));
       localStorage.setItem('db_progres', JSON.stringify(db.progres));
+      localStorage.setItem('db_queue', JSON.stringify(db.queue));
       localStorage.setItem('db_password', db.password);
       renderAll();
     }
@@ -464,11 +479,23 @@
 
     function renderAll() {
       renderStats();
+      renderQueueCard();
       renderKelasCards();
       renderSiswaList();
       populateKelasFilter();
       filterSiswaByKelas();
       renderProgresHistory();
+    }
+
+    function renderQueueCard() {
+      const queueCard = document.getElementById('queueCard');
+      const countText = document.getElementById('queueCountText');
+      if (db.queue.length > 0) {
+        countText.innerText = `${db.queue.length} data tersimpan di memori HP belum terkirim ke spreadsheet`;
+        queueCard.classList.remove('hidden');
+      } else {
+        queueCard.classList.add('hidden');
+      }
     }
 
     function renderStats() {
@@ -557,7 +584,6 @@
       ).catch(err => console.log('Scanner start error:', err));
     }
 
-    // PENCEGAHAN SCAN GANDA & SINKRONISASI TANGGAL
     function recordAbsensi(rawQrText, status) {
       const todayISO = getLocalDateString(new Date());
       const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -573,7 +599,6 @@
       const studentName = student ? student.Nama : "Siswa Tidak Dikenal";
       const studentClass = student ? student.Kelas : "-";
 
-      // Cek apakah siswa sudah terdaftar absensinya HARI INI
       const alreadyScanned = db.absensi.some(a => 
         String(a.NIS) === finalNis && String(a.Tanggal).split('T')[0] === todayISO
       );
@@ -588,13 +613,11 @@
       document.getElementById('resWaktu').innerText = now;
 
       if (alreadyScanned) {
-        // Tampilan Peringatan Jika Sudah Di-Scan Hari Ini
         iconContainer.className = "w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center text-2xl mb-2 border border-amber-500/40";
         icon.className = "fa-solid fa-triangle-exclamation";
         title.className = "text-[10px] text-amber-400 font-semibold tracking-wider uppercase";
         title.innerText = "Sudah Absen Hari Ini";
       } else {
-        // Tampilan Berhasil Absen Baru
         iconContainer.className = "w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-2xl mb-2 border border-emerald-500/40";
         icon.className = "fa-solid fa-circle-check";
         title.className = "text-[10px] text-emerald-400 font-semibold tracking-wider uppercase";
@@ -612,18 +635,9 @@
         };
 
         db.absensi.push(absensiData);
+        db.queue.push({ action: 'recordSingleAbsensi', data: absensiData });
         saveLocal();
-
-        if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-          fetch(GAS_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'recordSingleAbsensi', data: absensiData })
-          })
-          .then(res => res.json())
-          .then(res => console.log('Auto-sync sukses:', res))
-          .catch(err => console.log('Auto-sync offline/gagal:', err));
-        }
+        processQueueBackground();
       }
 
       document.getElementById('scanOverlay').classList.remove('hidden');
@@ -712,6 +726,7 @@
 
       saveLocal();
       closeModalSiswa();
+      processQueueBackground();
     }
 
     function editSiswa(nis) {
@@ -729,6 +744,7 @@
       if (confirm('Yakin ingin menghapus siswa ini?')) {
         db.siswa = db.siswa.filter(s => String(s.NIS) !== String(nis));
         saveLocal();
+        processQueueBackground();
       }
     }
 
@@ -751,6 +767,7 @@
           }
         });
         saveLocal();
+        processQueueBackground();
         alert('Upload Kolektif Berhasil!');
       };
       reader.readAsArrayBuffer(file);
@@ -781,23 +798,14 @@
       };
 
       db.progres.push(progresData);
+      db.queue.push({ action: 'recordSingleProgres', data: progresData });
       saveLocal();
 
       document.getElementById('formProgres').reset();
       filterSiswaByKelas();
+      processQueueBackground();
 
-      if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-        fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'recordSingleProgres', data: progresData })
-        })
-        .then(res => res.json())
-        .then(res => console.log('Auto-sync progres sukses:', res))
-        .catch(err => console.log('Auto-sync progres gagal:', err));
-      }
-
-      alert('Progres berhasil disimpan!');
+      alert('Progres tersimpan di aplikasi!');
     }
 
     function renderProgresHistory() {
@@ -860,6 +868,7 @@
 
         saveLocal();
         closeModalEditProgres();
+        processQueueBackground();
         alert('Data progres berhasil diperbarui!');
       }
     }
@@ -868,30 +877,30 @@
       if (confirm('Yakin ingin menghapus riwayat progres ini?')) {
         db.progres = db.progres.filter(p => p.ID !== id);
         saveLocal();
+        processQueueBackground();
       }
     }
 
-    // SYSTEM PREVIEW & EXPORT LAPORAN
+    // SYSTEM PREVIEW LAPORAN FILTER TANGGAL TERTENTU
     function previewLaporan(type) {
       activePreviewType = type;
       const container = document.getElementById('previewContainer');
       const title = document.getElementById('previewTitle');
 
       if (type === 'absensi') {
-        const start = document.getElementById('absentStartDate').value;
-        const end = document.getElementById('absentEndDate').value;
+        const targetDate = document.getElementById('absentSingleDate').value;
 
-        if (!start || !end) return alert('Silakan pilih rentang tanggal laporan kehadiran!');
+        if (!targetDate) return alert('Silakan pilih tanggal kehadiran!');
 
-        title.innerText = `Preview Laporan Kehadiran (${formatDateDisplay(start)} - ${formatDateDisplay(end)})`;
+        title.innerText = `Preview Laporan Kehadiran (${formatDateDisplay(targetDate)})`;
         
         activePreviewData = db.absensi.filter(a => {
           const aDate = String(a.Tanggal).split('T')[0];
-          return aDate >= start && aDate <= end;
+          return aDate === targetDate;
         });
 
         if (activePreviewData.length === 0) {
-          container.innerHTML = '<p class="text-slate-400 italic text-center py-4">Tidak ada data kehadiran pada rentang tanggal tersebut.</p>';
+          container.innerHTML = '<p class="text-slate-400 italic text-center py-4">Tidak ada data kehadiran pada tanggal tersebut.</p>';
         } else {
           container.innerHTML = `
             <table class="w-full text-left border-collapse">
@@ -970,7 +979,6 @@
       document.getElementById('modalPreview').classList.add('hidden');
     }
 
-    // EXPORT LAPORAN
     function executeExport(format) {
       if (activePreviewData.length === 0) return alert('Tidak ada data untuk diunduh!');
 
@@ -1014,9 +1022,10 @@
         const doc = new jsPDF();
 
         if (activePreviewType === 'absensi') {
+          const targetDate = document.getElementById('absentSingleDate').value;
           doc.text("Laporan Kehadiran Pengajian Siswa", 14, 15);
           doc.setFontSize(10);
-          doc.text(`Periode: ${formatDateDisplay(document.getElementById('absentStartDate').value)} s/d ${formatDateDisplay(document.getElementById('absentEndDate').value)}`, 14, 22);
+          doc.text(`Tanggal: ${formatDateDisplay(targetDate)}`, 14, 22);
 
           const bodyData = activePreviewData.map(a => {
             const s = db.siswa.find(x => String(x.NIS) === String(a.NIS)) || { Nama: a.Nama || a.NIS, Kelas: a.Kelas || '-' };
@@ -1051,6 +1060,42 @@
       }
     }
 
+    // SYSTEM BACKGROUND AUTOMATIC SYNC
+    function processQueueBackground() {
+      if (!navigator.onLine || !GAS_URL || GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT") || isSyncing) return;
+
+      const syncIcon = document.getElementById('syncIcon');
+      const syncText = document.getElementById('syncText');
+
+      // 1. Jika ada item antrean terpisah
+      if (db.queue.length > 0) {
+        isSyncing = true;
+        syncIcon.className = "fa-solid fa-arrows-rotate fa-spin";
+        syncText.innerText = "Mengirim...";
+
+        const item = db.queue[0];
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(item)
+        })
+        .then(res => res.json())
+        .then(res => {
+          db.queue.shift(); // Hapus item yang sukses dikirim
+          saveLocal();
+          isSyncing = false;
+          processQueueBackground(); // Proses item antrean berikutnya
+        })
+        .catch(err => {
+          console.log('Background queue error:', err);
+          isSyncing = false;
+        });
+      } else {
+        syncIcon.className = "fa-solid fa-cloud-arrow-up";
+        syncText.innerText = "Terhubung";
+      }
+    }
+
     function changePassword(e) {
       e.preventDefault();
       const oldP = document.getElementById('oldPass').value;
@@ -1079,29 +1124,6 @@
             saveLocal();
           }
         }).catch(err => console.log('Offline / Fetch Ignored'));
-    }
-
-    function syncLocalToRemote() {
-      if (!navigator.onLine) return alert('HP Anda sedang Offline. Hubungkan ke internet untuk melakukan Sync.');
-      if (!GAS_URL || GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return alert('Harap atur GAS_URL terlebih dahulu!');
-
-      const icon = document.getElementById('syncIcon');
-      icon.classList.add('fa-spin');
-
-      fetch(GAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'syncData', payload: db })
-      })
-      .then(res => res.json())
-      .then(res => {
-        icon.classList.remove('fa-spin');
-        alert('Sinkronisasi kilat ke spreadsheet berhasil!');
-      })
-      .catch(err => {
-        icon.classList.remove('fa-spin');
-        alert('Gagal terhubung ke spreadsheet server.');
-      });
     }
   </script>
 </body>
