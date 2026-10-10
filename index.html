@@ -678,7 +678,7 @@
 
       if (!nis) return alert('Silakan pilih siswa!');
 
-      db.progres.push({
+      const progresData = {
         ID: 'PROG-' + Date.now(),
         NIS: String(nis),
         Tanggal: new Date().toISOString().split('T')[0],
@@ -686,12 +686,29 @@
         Detail: detail,
         HalamanSurat: hal,
         Catatan: catatan
-      });
+      };
 
+      // 1. Simpan ke LocalStorage HP lebih dulu (Offline-First)
+      db.progres.push(progresData);
       saveLocal();
+
+      // Reset form & perbarui UI
       document.getElementById('formProgres').reset();
       filterSiswaByKelas();
-      alert('Progres berhasil disimpan!');
+
+      // 2. AUTO-SYNC: Langsung kirim ke Spreadsheet di Background
+      if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'recordSingleProgres', data: progresData })
+        })
+        .then(res => res.json())
+        .then(res => console.log('Auto-sync progres sukses:', res))
+        .catch(err => console.log('Auto-sync progres gagal/offline:', err));
+      }
+
+      alert('Progres berhasil disimpan & terkirim ke spreadsheet!');
     }
 
     function renderProgresHistory() {
