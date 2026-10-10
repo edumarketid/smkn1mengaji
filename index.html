@@ -165,8 +165,16 @@
     <section id="view-scan" class="space-y-4 hidden">
       <div class="bg-white p-4 rounded-2xl shadow-sm text-center">
         <h3 class="font-bold text-slate-700 mb-1">Scanner Kehadiran</h3>
-        <p class="text-xs text-slate-500 mb-3">Arahkan kamera ke QR Code milik siswa</p>
+        <p class="text-xs text-slate-500 mb-3">Pilih jenis kehadiran lalu arahkan kamera ke QR Code</p>
         
+        <!-- PILIHAN MODE SCAN -->
+        <div class="mb-3">
+          <select id="scanTargetType" class="w-full border p-2.5 rounded-xl bg-emerald-50 text-emerald-800 font-bold text-xs text-center border-emerald-300">
+            <option value="pengajian">Pengajian Siswa</option>
+            <option value="shalat">Shalat Dzuhur Berjamaah</option>
+          </select>
+        </div>
+
         <div class="relative w-full max-w-[280px] mx-auto">
           <div id="reader" class="overflow-hidden rounded-2xl border-2 border-emerald-500 bg-slate-900 min-h-[260px] relative"></div>
           
@@ -222,9 +230,10 @@
 
     <!-- VIEW 5: LAPORAN & PENGATURAN -->
     <section id="view-laporan" class="space-y-4 hidden">
+      <!-- LAPORAN KEHADIRAN PENGAJIAN -->
       <div class="bg-white p-4 rounded-2xl shadow-sm space-y-3">
         <h3 class="font-bold text-slate-700 text-xs flex items-center gap-1">
-          <i class="fa-solid fa-calendar-check text-emerald-600"></i> Laporan Khusus Kehadiran Siswa
+          <i class="fa-solid fa-calendar-check text-emerald-600"></i> Laporan Kehadiran Pengajian
         </h3>
         
         <div>
@@ -233,10 +242,27 @@
         </div>
 
         <button onclick="previewLaporan('absensi')" class="w-full bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-1 active:scale-95 transition">
-          <i class="fa-solid fa-eye"></i> Preview Laporan Kehadiran
+          <i class="fa-solid fa-eye"></i> Preview Laporan Pengajian
         </button>
       </div>
 
+      <!-- LAPORAN KEHADIRAN SHALAT DZUHUR -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+        <h3 class="font-bold text-slate-700 text-xs flex items-center gap-1">
+          <i class="fa-solid fa-mosque text-emerald-600"></i> Laporan Shalat Dzuhur Berjamaah
+        </h3>
+        
+        <div>
+          <label class="block text-slate-500 font-semibold mb-1 text-xs">Pilih Tanggal Shalat Dzuhur</label>
+          <input type="date" id="shalatSingleDate" class="w-full border p-2.5 rounded-xl bg-slate-50 text-xs">
+        </div>
+
+        <button onclick="previewLaporan('shalat')" class="w-full bg-emerald-700 text-white text-xs font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-1 active:scale-95 transition">
+          <i class="fa-solid fa-eye"></i> Preview Laporan Shalat Dzuhur
+        </button>
+      </div>
+
+      <!-- LAPORAN PROGRES -->
       <div class="bg-white p-4 rounded-2xl shadow-sm space-y-3">
         <h3 class="font-bold text-slate-700 text-xs flex items-center gap-1">
           <i class="fa-solid fa-book-quran text-emerald-600"></i> Laporan Monitoring Progres Mengaji
@@ -247,6 +273,7 @@
         </button>
       </div>
 
+      <!-- PENGATURAN -->
       <div class="bg-white p-4 rounded-2xl shadow-sm space-y-3">
         <h3 class="font-bold text-slate-700 text-xs"><i class="fa-solid fa-lock text-emerald-600 mr-1"></i> Pengaturan Akun</h3>
         <form onsubmit="changePassword(event)" class="space-y-2 text-xs">
@@ -383,6 +410,7 @@
       siswa: JSON.parse(localStorage.getItem('db_siswa')) || [],
       absensi: JSON.parse(localStorage.getItem('db_absensi')) || [],
       progres: JSON.parse(localStorage.getItem('db_progres')) || [],
+      shalat: JSON.parse(localStorage.getItem('db_shalat')) || [],
       queue: JSON.parse(localStorage.getItem('db_queue')) || [],
       password: localStorage.getItem('db_password') || "1234"
     };
@@ -402,6 +430,7 @@
       const now = new Date();
       document.getElementById('todayDate').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       document.getElementById('absentSingleDate').value = getLocalDateString(now);
+      document.getElementById('shalatSingleDate').value = getLocalDateString(now);
 
       updateNetworkStatus();
       window.addEventListener('online', () => {
@@ -415,14 +444,11 @@
       processQueueBackground();
     };
 
-    // FUNGSI NORMALISASI FORMAT STRING TANGGAL (YYYY-MM-DD MURNI)
     function normalizeDate(val) {
       if (!val) return "";
       let str = String(val).trim();
       if (str.includes("T")) str = str.split("T")[0];
       if (str.includes(" ")) str = str.split(" ")[0];
-      
-      // Jika format DD/MM/YYYY
       if (str.includes("/")) {
         const p = str.split("/");
         if (p.length === 3 && p[2].length === 4) return `${p[2]}-${String(p[1]).padStart(2,'0')}-${String(p[0]).padStart(2,'0')}`;
@@ -462,6 +488,7 @@
       localStorage.setItem('db_siswa', JSON.stringify(db.siswa));
       localStorage.setItem('db_absensi', JSON.stringify(db.absensi));
       localStorage.setItem('db_progres', JSON.stringify(db.progres));
+      localStorage.setItem('db_shalat', JSON.stringify(db.shalat));
       localStorage.setItem('db_queue', JSON.stringify(db.queue));
       localStorage.setItem('db_password', db.password);
       renderAll();
@@ -512,7 +539,6 @@
       }
     }
 
-    // HITUNG STATISTIK DENGAN NORMALISASI TANGGAL KONSISTEN
     function renderStats() {
       const todayISO = getLocalDateString(new Date());
       
@@ -582,7 +608,8 @@
             html5QrcodeScanner.pause(true);
           }
 
-          recordAbsensi(decodedText, "Hadir");
+          const targetType = document.getElementById('scanTargetType').value;
+          recordAbsensiOrShalat(decodedText, "Hadir", targetType);
 
           setTimeout(() => {
             document.getElementById('scanOverlay').classList.add('hidden');
@@ -596,10 +623,9 @@
       ).catch(err => console.log('Scanner start error:', err));
     }
 
-    function recordAbsensi(rawQrText, status) {
+    function recordAbsensiOrShalat(rawQrText, status, type) {
       const todayISO = getLocalDateString(new Date());
       const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      
       const scannedCode = String(rawQrText).trim();
 
       const student = db.siswa.find(x => 
@@ -611,7 +637,10 @@
       const studentName = student ? student.Nama : "Siswa Tidak Dikenal";
       const studentClass = student ? student.Kelas : "-";
 
-      const alreadyScanned = db.absensi.some(a => 
+      const targetDb = type === 'shalat' ? db.shalat : db.absensi;
+      const targetAction = type === 'shalat' ? 'recordSingleShalat' : 'recordSingleAbsensi';
+
+      const alreadyScanned = targetDb.some(a => 
         String(a.NIS) === finalNis && normalizeDate(a.Tanggal) === todayISO
       );
 
@@ -628,26 +657,26 @@
         iconContainer.className = "w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center text-2xl mb-2 border border-amber-500/40";
         icon.className = "fa-solid fa-triangle-exclamation";
         title.className = "text-[10px] text-amber-400 font-semibold tracking-wider uppercase";
-        title.innerText = "Sudah Absen Hari Ini";
+        title.innerText = type === 'shalat' ? "Sudah Shalat Hari Ini" : "Sudah Absen Hari Ini";
       } else {
         iconContainer.className = "w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-2xl mb-2 border border-emerald-500/40";
         icon.className = "fa-solid fa-circle-check";
         title.className = "text-[10px] text-emerald-400 font-semibold tracking-wider uppercase";
-        title.innerText = "Berhasil Dicatat";
+        title.innerText = type === 'shalat' ? "Shalat Dicatat" : "Berhasil Dicatat";
 
-        const absensiData = {
-          ID: 'ABS-' + Date.now(),
+        const recData = {
+          ID: (type === 'shalat' ? 'SHL-' : 'ABS-') + Date.now(),
           NIS: finalNis,
           Nama: studentName,
           Kelas: studentClass,
           Tanggal: todayISO,
           Waktu: now,
           Status: status,
-          Keterangan: 'Hadir Via Scanner'
+          Keterangan: type === 'shalat' ? 'Shalat Dzuhur Masjid' : 'Hadir Via Scanner'
         };
 
-        db.absensi.push(absensiData);
-        db.queue.push({ action: 'recordSingleAbsensi', data: absensiData });
+        targetDb.push(recData);
+        db.queue.push({ action: targetAction, data: recData });
         saveLocal();
         processQueueBackground();
       }
@@ -893,23 +922,26 @@
       }
     }
 
-    // PREVIEW & CETAK LAPORAN (KOREKSI PRESISI TANGGAL PDF PROGRES)
+    // PREVIEW LAPORAN (PENGAJIAN, SHALAT DZUHUR, PROGRES)
     function previewLaporan(type) {
       activePreviewType = type;
       const container = document.getElementById('previewContainer');
       const title = document.getElementById('previewTitle');
 
-      if (type === 'absensi') {
-        const targetDate = document.getElementById('absentSingleDate').value;
+      if (type === 'absensi' || type === 'shalat') {
+        const inputId = type === 'shalat' ? 'shalatSingleDate' : 'absentSingleDate';
+        const targetDate = document.getElementById(inputId).value;
 
-        if (!targetDate) return alert('Silakan pilih tanggal kehadiran!');
+        if (!targetDate) return alert('Silakan pilih tanggal!');
 
-        title.innerText = `Preview Laporan Kehadiran (${formatDateDisplay(targetDate)})`;
+        const labelTitle = type === 'shalat' ? 'Laporan Shalat Dzuhur Berjamaah' : 'Laporan Kehadiran Pengajian';
+        title.innerText = `Preview ${labelTitle} (${formatDateDisplay(targetDate)})`;
         
-        activePreviewData = db.absensi.filter(a => normalizeDate(a.Tanggal) === targetDate);
+        const sourceData = type === 'shalat' ? db.shalat : db.absensi;
+        activePreviewData = sourceData.filter(a => normalizeDate(a.Tanggal) === targetDate);
 
         if (activePreviewData.length === 0) {
-          container.innerHTML = '<p class="text-slate-400 italic text-center py-4">Tidak ada data kehadiran pada tanggal tersebut.</p>';
+          container.innerHTML = `<p class="text-slate-400 italic text-center py-4">Tidak ada data ${type === 'shalat' ? 'shalat dzuhur' : 'kehadiran'} pada tanggal tersebut.</p>`;
         } else {
           container.innerHTML = `
             <table class="w-full text-left border-collapse">
@@ -996,7 +1028,8 @@
       if (format === 'excel') {
         const wb = XLSX.utils.book_new();
         
-        if (activePreviewType === 'absensi') {
+        if (activePreviewType === 'absensi' || activePreviewType === 'shalat') {
+          const sheetTitle = activePreviewType === 'shalat' ? "Laporan Shalat Dzuhur" : "Laporan Kehadiran";
           const exportData = activePreviewData.map(a => {
             const s = db.siswa.find(x => String(x.NIS) === String(a.NIS)) || { Nama: a.Nama || a.NIS, Kelas: a.Kelas || '-' };
             return { 
@@ -1007,8 +1040,8 @@
               Status: a.Status === 'Alfa' ? 'Alpa' : a.Status
             };
           });
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), "Laporan Kehadiran");
-          XLSX.writeFile(wb, `Laporan_Kehadiran_${dateStr}.xlsx`);
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), sheetTitle);
+          XLSX.writeFile(wb, `${sheetTitle.replace(/ /g, '_')}_${dateStr}.xlsx`);
         } else {
           const exportData = activePreviewData.map(p => {
             const s = db.siswa.find(x => String(x.NIS) === String(p.NIS)) || { Nama: p.Nama || p.NIS, Kelas: p.Kelas || '-' };
@@ -1030,9 +1063,12 @@
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
-        if (activePreviewType === 'absensi') {
-          const targetDate = document.getElementById('absentSingleDate').value;
-          doc.text("Laporan Kehadiran Kontrol Pengajian Siswa", 14, 15);
+        if (activePreviewType === 'absensi' || activePreviewType === 'shalat') {
+          const inputId = activePreviewType === 'shalat' ? 'shalatSingleDate' : 'absentSingleDate';
+          const targetDate = document.getElementById(inputId).value;
+          const headerTitle = activePreviewType === 'shalat' ? "Laporan Shalat Dzuhur Berjamaah Masjid/Musholah Sekolah" : "Laporan Kehadiran Kontrol Pengajian Siswa";
+
+          doc.text(headerTitle, 14, 15);
           doc.setFontSize(10);
           doc.text(`Tanggal: ${formatDateDisplay(targetDate)}`, 14, 22);
 
@@ -1047,7 +1083,7 @@
             body: bodyData,
           });
 
-          doc.save(`Laporan_Kehadiran_${dateStr}.pdf`);
+          doc.save(`${activePreviewType === 'shalat' ? 'Laporan_Shalat_Dzuhur' : 'Laporan_Kehadiran'}_${dateStr}.pdf`);
         } else {
           doc.text("Laporan Progres Mengaji & Hafalan Siswa", 14, 15);
           doc.setFontSize(10);
@@ -1127,6 +1163,7 @@
             if (data.siswa.length) db.siswa = data.siswa;
             if (data.absensi.length) db.absensi = data.absensi;
             if (data.progres.length) db.progres = data.progres;
+            if (data.shalat.length) db.shalat = data.shalat;
             if (data.password) db.password = String(data.password);
             saveLocal();
           }
