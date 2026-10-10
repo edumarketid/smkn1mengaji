@@ -85,7 +85,7 @@
       </div>
 
       <div class="bg-white p-4 rounded-2xl shadow-sm">
-        <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-clock-rotate-left text-emerald-600 mr-1"></i> Kehadiran Terbaru</h3>
+        <h3 class="font-bold text-sm text-slate-700 mb-3"><i class="fa-solid fa-clock-rotate-left text-emerald-600 mr-1"></i> Kehadiran Terbaru Hari Ini</h3>
         <div id="recentAttendanceList" class="space-y-2 text-xs text-slate-600">
           <p class="text-slate-400 italic">Belum ada data absensi hari ini.</p>
         </div>
@@ -206,16 +206,40 @@
 
     <!-- VIEW 5: LAPORAN & PENGATURAN -->
     <section id="view-laporan" class="space-y-4 hidden">
+      <!-- FITUR 1: LAPORAN KHUSUS KEHADIRAN DENGAN FILTER TANGGAL -->
       <div class="bg-white p-4 rounded-2xl shadow-sm space-y-3">
-        <h3 class="font-bold text-slate-700 text-xs"><i class="fa-solid fa-file-invoice text-emerald-600 mr-1"></i> Cetak Laporan Kehadiran & Bacaan</h3>
-        <button onclick="exportExcel()" class="w-full bg-emerald-600 text-white text-xs font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-2">
-          <i class="fa-solid fa-file-excel text-sm"></i> Download Laporan Excel
-        </button>
-        <button onclick="exportPDF()" class="w-full bg-rose-600 text-white text-xs font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-2">
-          <i class="fa-solid fa-file-pdf text-sm"></i> Download Laporan PDF
+        <h3 class="font-bold text-slate-700 text-xs flex items-center gap-1">
+          <i class="fa-solid fa-calendar-check text-emerald-600"></i> Laporan Khusus Kehadiran Siswa
+        </h3>
+        
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label class="block text-slate-500 font-semibold mb-1">Mulai Tanggal</label>
+            <input type="date" id="absentStartDate" class="w-full border p-2 rounded-xl bg-slate-50">
+          </div>
+          <div>
+            <label class="block text-slate-500 font-semibold mb-1">Sampai Tanggal</label>
+            <input type="date" id="absentEndDate" class="w-full border p-2 rounded-xl bg-slate-50">
+          </div>
+        </div>
+
+        <button onclick="previewLaporan('absensi')" class="w-full bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-1 active:scale-95 transition">
+          <i class="fa-solid fa-eye"></i> Preview Laporan Kehadiran
         </button>
       </div>
 
+      <!-- FITUR 2: LAPORAN PROGRES BACAAN / HAFALAN -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+        <h3 class="font-bold text-slate-700 text-xs flex items-center gap-1">
+          <i class="fa-solid fa-book-quran text-emerald-600"></i> Laporan Monitoring Progres Mengaji
+        </h3>
+        
+        <button onclick="previewLaporan('progres')" class="w-full bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-1 active:scale-95 transition">
+          <i class="fa-solid fa-eye"></i> Preview Laporan Progres
+        </button>
+      </div>
+
+      <!-- PENGATURAN AKUN -->
       <div class="bg-white p-4 rounded-2xl shadow-sm space-y-3">
         <h3 class="font-bold text-slate-700 text-xs"><i class="fa-solid fa-lock text-emerald-600 mr-1"></i> Pengaturan Akun</h3>
         <form onsubmit="changePassword(event)" class="space-y-2 text-xs">
@@ -227,6 +251,53 @@
     </section>
 
   </main>
+
+  <!-- MODAL PREVIEW LAPORAN & DOWNLOAD -->
+  <div id="modalPreview" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+    <div class="bg-white w-full max-w-lg rounded-2xl p-4 shadow-xl max-h-[85vh] flex flex-col text-xs">
+      <div class="flex justify-between items-center pb-2 border-b mb-3">
+        <h3 id="previewTitle" class="font-bold text-slate-800 text-sm">Preview Laporan</h3>
+        <button onclick="closePreview()" class="text-slate-400 hover:text-rose-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div id="previewContainer" class="flex-1 overflow-auto space-y-2 my-2 border rounded-xl p-2 bg-slate-50">
+        <!-- Tabel Preview Diinject dari JS -->
+      </div>
+
+      <div class="flex gap-2 pt-3 border-t mt-2">
+        <button id="btnExportExcel" class="flex-1 bg-emerald-600 text-white font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-1">
+          <i class="fa-solid fa-file-excel"></i> Excel
+        </button>
+        <button id="btnExportPDF" class="flex-1 bg-rose-600 text-white font-semibold py-2.5 rounded-xl shadow flex items-center justify-center gap-1">
+          <i class="fa-solid fa-file-pdf"></i> PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Edit / Form Siswa -->
+  <div id="modalSiswa" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-5 space-y-3 text-xs">
+      <h3 id="modalSiswaTitle" class="font-bold text-sm text-slate-800">Tambah Data Siswa</h3>
+      <input type="hidden" id="editSiswaOldNis">
+      <div>
+        <label class="block font-semibold mb-1">NIS</label>
+        <input type="text" id="siswaNIS" class="w-full border p-2 rounded-xl" required>
+      </div>
+      <div>
+        <label class="block font-semibold mb-1">Nama Lengkap</label>
+        <input type="text" id="siswaNama" class="w-full border p-2 rounded-xl" required>
+      </div>
+      <div>
+        <label class="block font-semibold mb-1">Kelas/Kelompok</label>
+        <input type="text" id="siswaKelas" class="w-full border p-2 rounded-xl" required>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="closeModalSiswa()" type="button" class="flex-1 bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl">Batal</button>
+        <button onclick="saveSiswa()" type="button" class="flex-1 bg-emerald-600 text-white font-semibold py-2 rounded-xl">Simpan</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal Edit Progres -->
   <div id="modalEditProgres" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
@@ -264,30 +335,6 @@
       <div class="flex gap-2 pt-2">
         <button onclick="closeModalEditProgres()" type="button" class="flex-1 bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl">Batal</button>
         <button onclick="saveEditProgres()" type="button" class="flex-1 bg-emerald-600 text-white font-semibold py-2 rounded-xl">Simpan Perubahan</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Edit / Form Siswa -->
-  <div id="modalSiswa" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white w-full max-w-sm rounded-2xl p-5 space-y-3 text-xs">
-      <h3 id="modalSiswaTitle" class="font-bold text-sm text-slate-800">Tambah Data Siswa</h3>
-      <input type="hidden" id="editSiswaOldNis">
-      <div>
-        <label class="block font-semibold mb-1">NIS</label>
-        <input type="text" id="siswaNIS" class="w-full border p-2 rounded-xl" required>
-      </div>
-      <div>
-        <label class="block font-semibold mb-1">Nama Lengkap</label>
-        <input type="text" id="siswaNama" class="w-full border p-2 rounded-xl" required>
-      </div>
-      <div>
-        <label class="block font-semibold mb-1">Kelas/Kelompok</label>
-        <input type="text" id="siswaKelas" class="w-full border p-2 rounded-xl" required>
-      </div>
-      <div class="flex gap-2 pt-2">
-        <button onclick="closeModalSiswa()" type="button" class="flex-1 bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl">Batal</button>
-        <button onclick="saveSiswa()" type="button" class="flex-1 bg-emerald-600 text-white font-semibold py-2 rounded-xl">Simpan</button>
       </div>
     </div>
   </div>
@@ -337,19 +384,37 @@
     let html5QrcodeScanner = null;
     let currentFacingMode = "environment";
     let isProcessingScan = false;
+    let activePreviewData = [];
+    let activePreviewType = "";
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').then(() => console.log('SW Active'));
     }
 
     window.onload = function() {
-      document.getElementById('todayDate').innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const now = new Date();
+      document.getElementById('todayDate').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      
+      // Set default tanggal filter laporan absensi ke bulan berjalan
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const todayISO = getLocalDateString(now);
+      document.getElementById('absentStartDate').value = firstDay;
+      document.getElementById('absentEndDate').value = todayISO;
+
       updateNetworkStatus();
       window.addEventListener('online', updateNetworkStatus);
       window.addEventListener('offline', updateNetworkStatus);
       renderAll();
       fetchRemoteData();
     };
+
+    // Fungsi Pembantu Tanggal Lokal (YYYY-MM-DD Presisi)
+    function getLocalDateString(d = new Date()) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
 
     function updateNetworkStatus() {
       const dot = document.getElementById('netDot');
@@ -404,10 +469,11 @@
       renderProgresHistory();
     }
 
+    // STATISTIK & TAMPILAN KEHADIRAN HARI INI
     function renderStats() {
-      const today = new Date().toISOString().split('T')[0];
-      const todayAbsensi = db.absensi.filter(a => a.Tanggal === today);
-      
+      const todayISO = getLocalDateString(new Date());
+      const todayAbsensi = db.absensi.filter(a => String(a.Tanggal) === todayISO);
+
       document.getElementById('statHadir').innerText = todayAbsensi.filter(a => a.Status === 'Hadir').length;
       document.getElementById('statIzin').innerText = todayAbsensi.filter(a => a.Status === 'Izin').length;
       document.getElementById('statAlfa').innerText = todayAbsensi.filter(a => a.Status === 'Alfa').length;
@@ -416,10 +482,10 @@
       if (todayAbsensi.length === 0) {
         listContainer.innerHTML = '<p class="text-slate-400 italic">Belum ada data absensi hari ini.</p>';
       } else {
-        listContainer.innerHTML = todayAbsensi.slice(-5).reverse().map(a => {
+        listContainer.innerHTML = todayAbsensi.slice(-10).reverse().map(a => {
           const s = db.siswa.find(x => String(x.NIS) === String(a.NIS)) || { Nama: a.NIS, Kelas: '-' };
           return `
-            <div class="flex justify-between items-center p-2 bg-slate-50 rounded-xl">
+            <div class="flex justify-between items-center p-2 bg-slate-50 rounded-xl border border-slate-100">
               <div>
                 <p class="font-bold text-slate-700">${s.Nama} <span class="text-[10px] text-slate-400">(${s.Kelas})</span></p>
                 <p class="text-[10px] text-slate-400">${a.Waktu}</p>
@@ -487,31 +553,28 @@
     }
 
     function recordAbsensi(rawQrText, status) {
-      const today = new Date().toISOString().split('T')[0];
+      const todayISO = getLocalDateString(new Date());
       const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       
-      const scannedCode = String(rawQrText).trim(); // Kode QR utuh (misal: S001)
+      const scannedCode = String(rawQrText).trim();
 
-      // 1. Cari Siswa berdasarkan QR_Code terlebih dahulu, jika tidak ada baru cari berdasarkan NIS
       const student = db.siswa.find(x => 
         (x.QR_Code && String(x.QR_Code).trim().toUpperCase() === scannedCode.toUpperCase()) ||
         String(x.NIS).trim() === scannedCode
       );
 
-      // Ambil NIS asli siswa jika terdaftar
       const finalNis = student ? String(student.NIS) : scannedCode;
 
       const absensiData = {
         ID: 'ABS-' + Date.now(),
         NIS: finalNis,
-        Tanggal: today,
+        Tanggal: todayISO,
         Waktu: now,
         Status: status,
         Keterangan: 'Hadir Via Scanner'
       };
 
-      // 2. Simpan ke LocalStorage HP
-      const existingIndex = db.absensi.findIndex(a => String(a.NIS) === finalNis && a.Tanggal === today);
+      const existingIndex = db.absensi.findIndex(a => String(a.NIS) === finalNis && String(a.Tanggal) === todayISO);
       if (existingIndex >= 0) {
         db.absensi[existingIndex].Status = status;
         db.absensi[existingIndex].Waktu = now;
@@ -520,15 +583,13 @@
       }
       saveLocal();
 
-      // 3. Update Tampilan Overlay di Dalam Kamera
       document.getElementById('resNama').innerText = student ? student.Nama : "Siswa Tidak Dikenal";
       document.getElementById('resKelas').innerText = student ? student.Kelas : "-";
-      document.getElementById('resNis').innerText = finalNis; // Menampilkan NIS Asli Siswa
+      document.getElementById('resNis').innerText = finalNis;
       document.getElementById('resWaktu').innerText = now;
 
       document.getElementById('scanOverlay').classList.remove('hidden');
 
-      // 4. AUTO-SYNC Otomatis ke Spreadsheet
       if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
         fetch(GAS_URL, {
           method: 'POST',
@@ -681,22 +742,19 @@
       const progresData = {
         ID: 'PROG-' + Date.now(),
         NIS: String(nis),
-        Tanggal: new Date().toISOString().split('T')[0],
+        Tanggal: getLocalDateString(new Date()),
         Tipe: tipe,
         Detail: detail,
         HalamanSurat: hal,
         Catatan: catatan
       };
 
-      // 1. Simpan ke LocalStorage HP lebih dulu (Offline-First)
       db.progres.push(progresData);
       saveLocal();
 
-      // Reset form & perbarui UI
       document.getElementById('formProgres').reset();
       filterSiswaByKelas();
 
-      // 2. AUTO-SYNC: Langsung kirim ke Spreadsheet di Background
       if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
         fetch(GAS_URL, {
           method: 'POST',
@@ -705,10 +763,10 @@
         })
         .then(res => res.json())
         .then(res => console.log('Auto-sync progres sukses:', res))
-        .catch(err => console.log('Auto-sync progres gagal/offline:', err));
+        .catch(err => console.log('Auto-sync progres gagal:', err));
       }
 
-      alert('Progres berhasil disimpan & terkirim ke spreadsheet!');
+      alert('Progres berhasil disimpan!');
     }
 
     function renderProgresHistory() {
@@ -782,34 +840,165 @@
       }
     }
 
-    function exportExcel() {
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.siswa), "Siswa");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.absensi), "Absensi");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.progres), "Progres");
-      XLSX.writeFile(wb, `Laporan_Pengajian_${new Date().toISOString().split('T')[0]}.xlsx`);
+    // SYSTEM PREVIEW & EXPORT LAPORAN
+    function previewLaporan(type) {
+      activePreviewType = type;
+      const container = document.getElementById('previewContainer');
+      const title = document.getElementById('previewTitle');
+
+      if (type === 'absensi') {
+        const start = document.getElementById('absentStartDate').value;
+        const end = document.getElementById('absentEndDate').value;
+
+        if (!start || !end) return alert('Silakan pilih rentang tanggal laporan kehadiran!');
+
+        title.innerText = `Preview Laporan Kehadiran (${start} s/d ${end})`;
+        
+        // Filter Absensi Berdasarkan Rentang Tanggal
+        activePreviewData = db.absensi.filter(a => a.Tanggal >= start && a.Tanggal <= end);
+
+        if (activePreviewData.length === 0) {
+          container.innerHTML = '<p class="text-slate-400 italic text-center py-4">Tidak ada data kehadiran pada rentang tanggal tersebut.</p>';
+        } else {
+          container.innerHTML = `
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-200 text-slate-700 font-bold">
+                  <th class="p-1.5 border">Tgl</th>
+                  <th class="p-1.5 border">Nama</th>
+                  <th class="p-1.5 border">Kelas</th>
+                  <th class="p-1.5 border">Waktu</th>
+                  <th class="p-1.5 border">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${activePreviewData.map(a => {
+                  const s = db.siswa.find(x => String(x.NIS) === String(a.NIS)) || { Nama: a.NIS, Kelas: '-' };
+                  return `
+                    <tr class="border-b">
+                      <td class="p-1.5 border whitespace-nowrap">${a.Tanggal}</td>
+                      <td class="p-1.5 border font-semibold">${s.Nama}</td>
+                      <td class="p-1.5 border">${s.Kelas}</td>
+                      <td class="p-1.5 border">${a.Waktu}</td>
+                      <td class="p-1.5 border"><span class="px-1 py-0.5 rounded text-[9px] font-bold ${a.Status==='Hadir'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}">${a.Status}</span></td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          `;
+        }
+      } else if (type === 'progres') {
+        title.innerText = "Preview Laporan Progres Mengaji & Hafalan";
+        activePreviewData = db.progres;
+
+        if (activePreviewData.length === 0) {
+          container.innerHTML = '<p class="text-slate-400 italic text-center py-4">Belum ada data progres mengaji.</p>';
+        } else {
+          container.innerHTML = `
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-200 text-slate-700 font-bold">
+                  <th class="p-1.5 border">Tgl</th>
+                  <th class="p-1.5 border">Nama</th>
+                  <th class="p-1.5 border">Kategori</th>
+                  <th class="p-1.5 border">Detail</th>
+                  <th class="p-1.5 border">Hal/Ayat</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${activePreviewData.map(p => {
+                  const s = db.siswa.find(x => String(x.NIS) === String(p.NIS)) || { Nama: p.NIS, Kelas: '-' };
+                  return `
+                    <tr class="border-b">
+                      <td class="p-1.5 border whitespace-nowrap">${p.Tanggal}</td>
+                      <td class="p-1.5 border font-semibold">${s.Nama}</td>
+                      <td class="p-1.5 border text-emerald-700 font-bold">${p.Tipe}</td>
+                      <td class="p-1.5 border">${p.Detail}</td>
+                      <td class="p-1.5 border">${p.HalamanSurat}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          `;
+        }
+      }
+
+      // Hubungkan Event Listener Tombol Download Modal
+      document.getElementById('btnExportExcel').onclick = function() { executeExport('excel'); };
+      document.getElementById('btnExportPDF').onclick = function() { executeExport('pdf'); };
+
+      document.getElementById('modalPreview').classList.remove('hidden');
     }
 
-    function exportPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
+    function closePreview() {
+      document.getElementById('modalPreview').classList.add('hidden');
+    }
 
-      doc.text("Laporan Monitoring Pengajian Siswa", 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 22);
+    function executeExport(format) {
+      if (activePreviewData.length === 0) return alert('Tidak ada data untuk diunduh!');
 
-      const progresData = db.progres.map(p => {
-        const s = db.siswa.find(x => String(x.NIS) === String(p.NIS)) || { Nama: p.NIS, Kelas: '-' };
-        return [p.Tanggal, s.Nama, s.Kelas, p.Tipe, p.Detail, p.HalamanSurat, p.Catatan || '-'];
-      });
+      const dateStr = getLocalDateString(new Date());
 
-      doc.autoTable({
-        startY: 28,
-        head: [['Tanggal', 'Nama Siswa', 'Kelas', 'Kategori', 'Tingkat/Surah', 'Hal/Ayat', 'Catatan']],
-        body: progresData,
-      });
+      if (format === 'excel') {
+        const wb = XLSX.utils.book_new();
+        
+        if (activePreviewType === 'absensi') {
+          const exportData = activePreviewData.map(a => {
+            const s = db.siswa.find(x => String(x.NIS) === String(a.NIS)) || { Nama: a.NIS, Kelas: '-' };
+            return { Tanggal: a.Tanggal, Waktu: a.Waktu, NIS: a.NIS, Nama: s.Nama, Kelas: s.Kelas, Status: a.Status, Keterangan: a.Keterangan };
+          });
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), "Laporan Kehadiran");
+          XLSX.writeFile(wb, `Laporan_Kehadiran_${dateStr}.xlsx`);
+        } else {
+          const exportData = activePreviewData.map(p => {
+            const s = db.siswa.find(x => String(x.NIS) === String(p.NIS)) || { Nama: p.NIS, Kelas: '-' };
+            return { Tanggal: p.Tanggal, NIS: p.NIS, Nama: s.Nama, Kelas: s.Kelas, Kategori: p.Tipe, Tingkat_Surah: p.Detail, Hal_Ayat: p.HalamanSurat, Catatan: p.Catatan };
+          });
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), "Laporan Progres");
+          XLSX.writeFile(wb, `Laporan_Progres_${dateStr}.xlsx`);
+        }
+      } else if (format === 'pdf') {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
 
-      doc.save(`Laporan_Pengajian_${new Date().toISOString().split('T')[0]}.pdf`);
+        if (activePreviewType === 'absensi') {
+          doc.text("Laporan Kehadiran Pengajian Siswa", 14, 15);
+          doc.setFontSize(10);
+          doc.text(`Periode: ${document.getElementById('absentStartDate').value} s/d ${document.getElementById('absentEndDate').value}`, 14, 22);
+
+          const bodyData = activePreviewData.map(a => {
+            const s = db.siswa.find(x => String(x.NIS) === String(a.NIS)) || { Nama: a.NIS, Kelas: '-' };
+            return [a.Tanggal, a.Waktu, s.Nama, s.Kelas, a.Status];
+          });
+
+          doc.autoTable({
+            startY: 28,
+            head: [['Tanggal', 'Waktu', 'Nama Siswa', 'Kelas', 'Status']],
+            body: bodyData,
+          });
+
+          doc.save(`Laporan_Kehadiran_${dateStr}.pdf`);
+        } else {
+          doc.text("Laporan Progres Mengaji & Hafalan Siswa", 14, 15);
+          doc.setFontSize(10);
+          doc.text(`Tanggal Cetak: ${dateStr}`, 14, 22);
+
+          const bodyData = activePreviewData.map(p => {
+            const s = db.siswa.find(x => String(x.NIS) === String(p.NIS)) || { Nama: p.NIS, Kelas: '-' };
+            return [p.Tanggal, s.Nama, s.Kelas, p.Tipe, p.Detail, p.HalamanSurat, p.Catatan || '-'];
+          });
+
+          doc.autoTable({
+            startY: 28,
+            head: [['Tanggal', 'Nama Siswa', 'Kelas', 'Kategori', 'Tingkat/Surah', 'Hal/Ayat', 'Catatan']],
+            body: bodyData,
+          });
+
+          doc.save(`Laporan_Progres_${dateStr}.pdf`);
+        }
+      }
     }
 
     function changePassword(e) {
