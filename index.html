@@ -156,10 +156,10 @@
           
           <!-- OVERLAY HASIL SCAN DALAM BINGKAI -->
           <div id="scanOverlay" class="absolute inset-0 bg-slate-900/90 backdrop-blur-sm rounded-2xl z-20 flex flex-col justify-center items-center p-4 text-white hidden">
-            <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-2xl mb-2 border border-emerald-500/40">
-              <i class="fa-solid fa-circle-check"></i>
+            <div id="scanIconContainer" class="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-2xl mb-2 border border-emerald-500/40">
+              <i id="scanIcon" class="fa-solid fa-circle-check"></i>
             </div>
-            <p class="text-[10px] text-emerald-400 font-semibold tracking-wider uppercase">Berhasil Dicatat</p>
+            <p id="scanStatusTitle" class="text-[10px] text-emerald-400 font-semibold tracking-wider uppercase">Berhasil Dicatat</p>
             <h4 id="resNama" class="font-bold text-base text-white text-center line-clamp-1 mt-0.5 mb-1">-</h4>
             <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-2 w-full text-[11px] space-y-1 text-slate-300">
               <div class="flex justify-between">
@@ -390,10 +390,9 @@
       const now = new Date();
       document.getElementById('todayDate').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const todayISO = getLocalDateString(now);
-      document.getElementById('absentStartDate').value = firstDay;
-      document.getElementById('absentEndDate').value = todayISO;
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      document.getElementById('absentStartDate').value = getLocalDateString(firstDay);
+      document.getElementById('absentEndDate').value = getLocalDateString(now);
 
       updateNetworkStatus();
       window.addEventListener('online', updateNetworkStatus);
@@ -402,8 +401,9 @@
       fetchRemoteData();
     };
 
+    // FUNGSI TANGGAL LOKAL AKURAT (MENGHINDARI SALAH ZONA WAKTU / MUNDUR 1 HARI)
     function getLocalDateString(d = new Date()) {
-      if (typeof d === 'string') d = new Date(d);
+      if (!(d instanceof Date) ||isNaN(d)) d = new Date(d);
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
@@ -412,7 +412,8 @@
 
     function formatDateDisplay(dStr) {
       if (!dStr) return '-';
-      const parts = String(dStr).split('T')[0].split('-');
+      const cleanStr = String(dStr).split('T')[0];
+      const parts = cleanStr.split('-');
       if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
       return dStr;
     }
@@ -470,7 +471,6 @@
       renderProgresHistory();
     }
 
-    // STATISTIK AKURAT SINKRON DENGAN GOOGLE SHEETS / LOKAL
     function renderStats() {
       const todayISO = getLocalDateString(new Date());
       
@@ -557,6 +557,7 @@
       ).catch(err => console.log('Scanner start error:', err));
     }
 
+    // PENCEGAHAN SCAN GANDA & SINKRONISASI TANGGAL
     function recordAbsensi(rawQrText, status) {
       const todayISO = getLocalDateString(new Date());
       const now = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -572,43 +573,60 @@
       const studentName = student ? student.Nama : "Siswa Tidak Dikenal";
       const studentClass = student ? student.Kelas : "-";
 
-      const absensiData = {
-        ID: 'ABS-' + Date.now(),
-        NIS: finalNis,
-        Nama: studentName,
-        Kelas: studentClass,
-        Tanggal: todayISO,
-        Waktu: now,
-        Status: status,
-        Keterangan: 'Hadir Via Scanner'
-      };
+      // Cek apakah siswa sudah terdaftar absensinya HARI INI
+      const alreadyScanned = db.absensi.some(a => 
+        String(a.NIS) === finalNis && String(a.Tanggal).split('T')[0] === todayISO
+      );
 
-      const existingIndex = db.absensi.findIndex(a => String(a.NIS) === finalNis && String(a.Tanggal).split('T')[0] === todayISO);
-      if (existingIndex >= 0) {
-        db.absensi[existingIndex].Status = status;
-        db.absensi[existingIndex].Waktu = now;
-      } else {
-        db.absensi.push(absensiData);
-      }
-      saveLocal();
+      const iconContainer = document.getElementById('scanIconContainer');
+      const icon = document.getElementById('scanIcon');
+      const title = document.getElementById('scanStatusTitle');
 
       document.getElementById('resNama').innerText = studentName;
       document.getElementById('resKelas').innerText = studentClass;
       document.getElementById('resNis').innerText = finalNis;
       document.getElementById('resWaktu').innerText = now;
 
-      document.getElementById('scanOverlay').classList.remove('hidden');
+      if (alreadyScanned) {
+        // Tampilan Peringatan Jika Sudah Di-Scan Hari Ini
+        iconContainer.className = "w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center text-2xl mb-2 border border-amber-500/40";
+        icon.className = "fa-solid fa-triangle-exclamation";
+        title.className = "text-[10px] text-amber-400 font-semibold tracking-wider uppercase";
+        title.innerText = "Sudah Absen Hari Ini";
+      } else {
+        // Tampilan Berhasil Absen Baru
+        iconContainer.className = "w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-2xl mb-2 border border-emerald-500/40";
+        icon.className = "fa-solid fa-circle-check";
+        title.className = "text-[10px] text-emerald-400 font-semibold tracking-wider uppercase";
+        title.innerText = "Berhasil Dicatat";
 
-      if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-        fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'recordSingleAbsensi', data: absensiData })
-        })
-        .then(res => res.json())
-        .then(res => console.log('Auto-sync sukses:', res))
-        .catch(err => console.log('Auto-sync offline/gagal:', err));
+        const absensiData = {
+          ID: 'ABS-' + Date.now(),
+          NIS: finalNis,
+          Nama: studentName,
+          Kelas: studentClass,
+          Tanggal: todayISO,
+          Waktu: now,
+          Status: status,
+          Keterangan: 'Hadir Via Scanner'
+        };
+
+        db.absensi.push(absensiData);
+        saveLocal();
+
+        if (navigator.onLine && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
+          fetch(GAS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'recordSingleAbsensi', data: absensiData })
+          })
+          .then(res => res.json())
+          .then(res => console.log('Auto-sync sukses:', res))
+          .catch(err => console.log('Auto-sync offline/gagal:', err));
+        }
       }
+
+      document.getElementById('scanOverlay').classList.remove('hidden');
     }
 
     function stopScanner() {
@@ -952,7 +970,7 @@
       document.getElementById('modalPreview').classList.add('hidden');
     }
 
-    // EXPORT PDF & EXCEL KHUSUS SESUAI PERMINTAAN (TANGGAL, NAMA, NIS, KELAS)
+    // EXPORT LAPORAN
     function executeExport(format) {
       if (activePreviewData.length === 0) return alert('Tidak ada data untuk diunduh!');
 
